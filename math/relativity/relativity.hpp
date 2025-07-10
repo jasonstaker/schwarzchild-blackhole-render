@@ -1,7 +1,7 @@
 #pragma once
 
-#include "../core/vec4.hpp"
 #include "../core/tensor.hpp"
+#include "../core/vec4.hpp"
 
 #include <cmath>
 
@@ -30,6 +30,7 @@ vec4<double> c_0(0.0, x, y, z);
 
 using namespace parameters;
 
+namespace relativity {
 // REQUIRES: cartesian is a cartesian coordinate
 // EFFECTS: converts given cartesian coordinates in to schwarzchild coordinates
 inline vec4<double> convert_to_schwarzchild(const vec4<double> cartesian) {
@@ -76,3 +77,6 @@ inline std::vector<vec4<double>> get_tetrad(const vec4<double> c_pos) {
 
     return {e_0, e_1, e_2, e_3};
 }
+}   // namespace relativity
+
+using namespace relativity;
