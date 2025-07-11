@@ -39,3 +39,10 @@
 
 # debug information files
 *.dwo
+build/
+output.png
+.clang-format
+.gitignore
+settings.json
+.vscode/c_cpp_properties.json
+output.jpg

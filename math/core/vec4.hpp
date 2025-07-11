@@ -3,6 +3,7 @@
 #include <cmath>
 #include <math.h>
 #include <vector>
+#include <random>
 
 template<typename T> class vec4 {
   private:
@@ -61,3 +62,7 @@ template<typename T> double dot(const vec4<T>& u, const vec4<T>& v) {
 }
 
 inline double degrees_to_radians(double degrees) { return degrees * (M_PI / 180); }
+
+inline double random_double() {
+    return std::rand() / (RAND_MAX + 1.0);
+}

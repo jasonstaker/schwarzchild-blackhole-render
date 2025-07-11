@@ -14,8 +14,8 @@ constexpr double mass_sm  = 1000;
 constexpr double mass     = mass_sm * SUN_MASS;
 constexpr double rs       = (2 * G * mass) / (C * C);
 constexpr double r_0      = 10 * rs;
-constexpr double theta_0  = PI / 4;
-constexpr double phi_0    = 10;
+constexpr double theta_0  = PI / 2;
+constexpr double phi_0    = 2;
 }   // namespace constants
 
 using namespace constants;
@@ -33,20 +33,17 @@ using namespace parameters;
 namespace relativity {
 // REQUIRES: cartesian is a cartesian coordinate
 // EFFECTS: converts given cartesian coordinates in to schwarzchild coordinates
-inline vec4<double> convert_to_schwarzchild(const vec4<double> cartesian) {
-    vec4<double> schwarzchild;
+inline vec4<double> convert_to_schwarzchild(const vec4<double>& cartesian) {
+    double t = cartesian[0];
+    double x = cartesian[1];
+    double y = cartesian[2];
+    double z = cartesian[3];
 
-    auto t = cartesian[0];
-    auto x = cartesian[1];
-    auto y = cartesian[2];
-    auto z = cartesian[3];
+    double r     = std::sqrt(x * x + y * y + z * z);
+    double theta = std::acos(z / r);
+    double phi   = std::atan2(y, x);
 
-    schwarzchild[0] = cartesian[0];
-    schwarzchild[1] = sqrt(x * x + y * y + z * z);
-    schwarzchild[2] = acos(z / r_0);
-    schwarzchild[3] = atan2(y, x);
-
-    return schwarzchild;
+    return vec4<double>(t, r, theta, phi);
 }
 
 // REQUIRES: c_pos is a cartesian position

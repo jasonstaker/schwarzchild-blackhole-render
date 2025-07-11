@@ -22,10 +22,9 @@ int main() {
     camera cam;
 
     cam.aspect_ratio = 16.0 / 9.0;
-    cam.image_width = 400;
-    cam.samples_per_pixel = 500;
-    cam.max_depth = 50;
-    cam.vfov = 20;
+    cam.image_width = 1920;
+    cam.samples_per_pixel = 10;
+    cam.vfov = 60;
 
     auto new_img = cam.render(width, height, channels, img);
     // Spacetime values

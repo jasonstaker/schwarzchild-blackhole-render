@@ -4,6 +4,7 @@
 #include "../math/relativity/geodesic.hpp"
 #include "../math/relativity/relativity.hpp"
 
+#include <algorithm>
 #include <array>
 #include <iostream>
 #include <omp.h>
@@ -21,7 +22,12 @@ class camera {
     vec4<double> pixel_delta_u;   // Offset to pixel to the right
     vec4<double> pixel_delta_v;   // Offset to pixel below
     vec4<double> u, v, w;         // Camera frame basis vectors
+    unsigned char* background;
+    int background_width;
+    int background_height;
 
+    // MODIFIES: this 
+    // EFFECTS: initializes all the necessary variables for rendering
     void initialize() {
         image_height = int(image_width / aspect_ratio);
         image_height = (image_height < 1) ? 1 : image_height;
@@ -48,35 +54,59 @@ class camera {
         pixel00_loc              = viewport_upper_left + 0.5 * (pixel_delta_u + pixel_delta_v);
     }
 
-    const geodesic get_geodesic(int i, int j) const {
-        geodesic g = {vec4<double>(), vec4<double>()};
+    // REQUIRES: i < image_width && j < image_height
+    // EFFECTS: returns a random geodesic 0.5 units away from the pixel center
+    geodesic get_geodesic(int i, int j) const {
+        auto v_i = pixel_delta_u * i;
+        auto v_j = pixel_delta_v * j;
+
+        auto pixel_sample = pixel00_loc + v_i + v_j + (pixel_delta_u * (random_double() - 0.5)) +
+                            (pixel_delta_v * (random_double() - 0.5));
+
+        geodesic g = {center, unit_vector(pixel_sample - center) * constants::C, 0.0};
         return g;
     }
 
-    vec4<float> sample_square() const {
-        return vec4(0, random_double() - 0.5, random_double - 0.5, 0);
-    }
-
+    // EFFECTS: returns the pixel mapped from spherical coordinates to texture coordinates
     color geodesic_pixel(const geodesic& g) const {
-        color c = {0, 0, 0};
+        auto velocity = unit_vector(g.velocity);
+
+        double theta = std::acos(velocity[3]);
+        double phi   = std::atan2(velocity[2], velocity[1]);
+
+        double u = std::fmod((phi + PI)/(2*PI) + 0.5, 1.0);
+        double v = (theta / PI);
+        int x    = static_cast<int>(u * (background_width - 1));
+        int y    = static_cast<int>(v * (background_height - 1));
+
+        int idx   = (y * background_width + x) * 3;
+        int red   = background[idx];
+        int green = background[idx + 1];
+        int blue  = background[idx + 2];
+
+        color c = {red, green, blue};
+
         return c;
     }
-
-    // unsigned char* map_to_background(const vec4<float>& direction) {}
 
   public:
     double aspect_ratio = 1.0;    // Ratio of image width over height
     int image_width     = 100;    // Rendered image width in pixel count
     int image_height;             // Rendered image height
     int samples_per_pixel = 10;   // Count of random samples for each pixel
-    int max_depth         = 10;   // Maximum number of ray bounces into scene
 
     double vfov           = 90;                         // Vertical view angle (field of view)
     vec4<double> lookfrom = c_0;                        // Point camera is looking from
     vec4<double> lookat   = vec4(0.0, 0.0, 0.0, 0.0);   // Point camera is looking at
     vec4<double> vup      = vec4(0.0, 0.0, 0.0, 1.0);   // Camera-relative "up" direction
 
+    // REQUIRES: width, height, channels, and img all correspond to the background image
+    // MODIFIES: this
+    // EFFECTS: renders and integrates all the geodesics
     unsigned char* render(int width, int height, int channels, unsigned char* img) {
+        this->background  = img;
+        background_width  = width;
+        background_height = height;
         initialize();
 
         size_t img_size = (image_width * image_height * channels);
@@ -100,19 +130,16 @@ class camera {
                     pixel_color.b += pixel.b;
                 }
 
-                image_buffer[j * image_height + 3 * image_width + 0] = pixel_color.r * pixel_samples_scale;
-                image_buffer[j * image_height + 3 * image_width + 1] = pixel_color.g * pixel_samples_scale;
-                image_buffer[j * image_height + 3 * image_width + 2] = pixel_color.b * pixel_samples_scale;
+                int r = std::clamp(int(pixel_color.r * pixel_samples_scale + 0.5), 0, 255);
+                image_buffer[(j * image_width + i) * 3 + 0] = static_cast<unsigned char>(r);
+                int g = std::clamp(int(pixel_color.g * pixel_samples_scale + 0.5), 0, 255);
+                image_buffer[(j * image_width + i) * 3 + 1] = static_cast<unsigned char>(g);
+                int b = std::clamp(int(pixel_color.b * pixel_samples_scale + 0.5), 0, 255);
+                image_buffer[(j * image_width + i) * 3 + 2] = static_cast<unsigned char>(b);
             }
         }
 
-        for (int i = 0; i < img_size; i += 3) {
-            p[0] = image_buffer[i];
-            p[1] = image_buffer[i + 1];
-            p[2] = image_buffer[i + 2];
-
-            p += 3;
-        }
+        memcpy(new_img, image_buffer.data(), img_size);
 
         return new_img;
     }
