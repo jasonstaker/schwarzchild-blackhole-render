@@ -10,6 +10,6 @@ template<typename T> class tensor {
   public:
     tensor(int width, int height) : width(width), height(height), data(width * height) {}
 
-    T& operator()(int x, int y) const { return data[y * width + x]; }
+    const T& operator()(int x, int y) const { return data[y * width + x]; }
     T& operator()(int x, int y) { return data[y * width + x]; }
 };
