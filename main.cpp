@@ -9,7 +9,6 @@
 #define STB_IMAGE_WRITE_IMPLEMENTATION
 #include "stb_image_write.h"
 
-
 #include <filesystem>
 
 int main() {
@@ -21,19 +20,16 @@ int main() {
     // Camera
     camera cam;
 
-    cam.aspect_ratio = 16.0 / 9.0;
-    cam.image_width = 1920;
-    cam.samples_per_pixel = 10;
-    cam.vfov = 60;
-
-    auto new_img = cam.render(width, height, channels, img);
-    // Spacetime values
-    auto sm            = get_schwarzchild_metric(c_0);
-    auto camera_tetrad = get_tetrad(c_0);
+    cam.aspect_ratio      = 16.0 / 9.0;
+    cam.image_width       = 1600;
+    cam.samples_per_pixel = 16;
+    cam.vfov              = 90;
 
     // Render
+    auto new_img = cam.render(width, height, channels, img);
 
     // Load Image
     stbi_write_jpg("output.jpg", cam.image_width, cam.image_height, 3, new_img, 100);
+    stbi_image_free(new_img);
     stbi_image_free(img);
 }
