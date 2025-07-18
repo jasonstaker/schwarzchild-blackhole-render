@@ -6,6 +6,8 @@
 
 #include <algorithm>
 #include <array>
+#include <atomic>
+#include <iomanip>
 #include <iostream>
 #include <omp.h>
 #include <vector>
@@ -14,19 +16,21 @@ struct color {
     int r, g, b;
 };
 
+// camera class specialized for black hole rendering
 class camera {
   private:
-    double pixel_samples_scale;   // Color scale factor for a sum of pixel samples
-    vec4<double> center;          // Camera center
-    vec4<double> pixel00_loc;     // Location of pixel 0, 0
-    vec4<double> pixel_delta_u;   // Offset to pixel to the right
-    vec4<double> pixel_delta_v;   // Offset to pixel below
-    vec4<double> u, v, w;         // Camera frame basis vectors
-    unsigned char* background;
-    int background_width;
-    int background_height;
+    double pixel_samples_scale;   // color scale factor for a sum of pixel samples
+    vec4<double> center;          // camera center
+    vec4<double> pixel00_loc;     // location of pixel 0, 0
+    vec4<double> pixel_delta_u;   // offset to pixel to the right
+    vec4<double> pixel_delta_v;   // offset to pixel below
+    vec4<double> u, v, w;         // camera frame basis vectors
 
-    // MODIFIES: this 
+    unsigned char* background;   // background image location
+    int background_width;        // background image width
+    int background_height;       // background image height
+
+    // MODIFIES: this
     // EFFECTS: initializes all the necessary variables for rendering
     void initialize() {
         image_height = int(image_width / aspect_ratio);
@@ -63,30 +67,52 @@ class camera {
         auto pixel_sample = pixel00_loc + v_i + v_j + (pixel_delta_u * (random_double() - 0.5)) +
                             (pixel_delta_v * (random_double() - 0.5));
 
-        geodesic g = {center, unit_vector(pixel_sample - center) * constants::C, 0.0};
+        geodesic g = {center, unit_vector(pixel_sample - center), 0.0};
         return g;
     }
 
+    // REQUIRES: g's position vector is in schwarzcschild coordinates
     // EFFECTS: returns the pixel mapped from spherical coordinates to texture coordinates
-    color geodesic_pixel(const geodesic& g) const {
-        auto velocity = unit_vector(g.velocity);
+    color geodesic_pixel(const geodesic& g) {
+        auto s_position = g.position;
 
-        double theta = std::acos(velocity[3]);
-        double phi   = std::atan2(velocity[2], velocity[1]);
+        double mag   = s_position.r();
+        double theta = s_position.theta();
+        double phi   = s_position.phi();
 
-        double u = std::fmod((phi + PI)/(2*PI) + 0.5, 1.0);
-        double v = (theta / PI);
-        int x    = static_cast<int>(u * (background_width - 1));
-        int y    = static_cast<int>(v * (background_height - 1));
+        if (s_position.r() <= R_S) { return {0, 0, 0}; }
 
-        int idx   = (y * background_width + x) * 3;
-        int red   = background[idx];
-        int green = background[idx + 1];
-        int blue  = background[idx + 2];
+        double raw_u = phi / (2 * PI);
+        double raw_v = theta / PI;
 
-        color c = {red, green, blue};
+        double u = raw_u - std::floor(raw_u);
+        double v = std::clamp(raw_v, 0.0, 1.0);
 
-        return c;
+        int x = int(u * (background_width - 1) + 0.5);
+        int y = int(v * (background_height - 1) + 0.5);
+        x     = std::clamp(x, 0, background_width - 1);
+        y     = std::clamp(y, 0, background_height - 1);
+
+        int idx = (y * background_width + x) * 3;
+        return {background[idx + 0], background[idx + 1], background[idx + 2]};
+    }
+
+    // EFFECTS: integrates a geodesic by max_steps, enforcing the null condition each time
+    geodesic run_geodesic(const geodesic& g_init) const {
+        int max_steps = 5000;
+        geodesic g    = {
+          convert_to_schwarzschild_pos(g_init.position), convert_to_schwarzschild_vel(g_init.velocity), 0.0};
+
+        g = enforce_null_condition(g);
+
+        for (int step = 1; step <= max_steps; step++) {
+            g = integrate(g);
+            g = enforce_null_condition(g);
+
+            if (check_termination(g)) { break; }
+        }
+
+        return g;
     }
 
   public:
@@ -95,10 +121,10 @@ class camera {
     int image_height;             // Rendered image height
     int samples_per_pixel = 10;   // Count of random samples for each pixel
 
-    double vfov           = 90;                         // Vertical view angle (field of view)
-    vec4<double> lookfrom = c_0;                        // Point camera is looking from
-    vec4<double> lookat   = vec4(0.0, 0.0, 0.0, 0.0);   // Point camera is looking at
-    vec4<double> vup      = vec4(0.0, 0.0, 0.0, 1.0);   // Camera-relative "up" direction
+    double vfov           = 90;                                // Vertical view angle (field of view)
+    vec4<double> lookfrom = c_0;                               // Point camera is looking from
+    vec4<double> lookat   = vec4(0.0, 0.0, 0.0, 0.0, false);   // Point camera is looking at
+    vec4<double> vup      = vec4(0.0, 0.0, 0.0, 1.0, false);   // Camera-relative "up" direction
 
     // REQUIRES: width, height, channels, and img all correspond to the background image
     // MODIFIES: this
@@ -116,27 +142,45 @@ class camera {
 
         unsigned char* p = new_img;
 
+        std::atomic<int> lines_done = 0;
+
 #pragma omp parallel for schedule(dynamic)
         for (int j = 0; j < image_height; j++) {
             for (int i = 0; i < image_width; i++) {
-                color pixel_color = {0, 0, 0};
+                bool allEscaped = true;
+                color sumColor  = {0, 0, 0};
 
-                for (int sample = 0; sample < samples_per_pixel; sample++) {
-                    geodesic g  = get_geodesic(i, j);
-                    color pixel = geodesic_pixel(g);
+                for (int sample = 0; sample < samples_per_pixel; ++sample) {
+                    geodesic g_init = get_geodesic(i, j);
+                    geodesic g      = run_geodesic(g_init);
 
-                    pixel_color.r += pixel.r;
-                    pixel_color.g += pixel.g;
-                    pixel_color.b += pixel.b;
+                    if (g.position.r() <= R_S) {
+                        allEscaped = false;
+                        break;
+                    }
+
+                    color pix = geodesic_pixel(g);
+                    sumColor.r += pix.r;
+                    sumColor.g += pix.g;
+                    sumColor.b += pix.b;
                 }
 
-                int r = std::clamp(int(pixel_color.r * pixel_samples_scale + 0.5), 0, 255);
-                image_buffer[(j * image_width + i) * 3 + 0] = static_cast<unsigned char>(r);
-                int g = std::clamp(int(pixel_color.g * pixel_samples_scale + 0.5), 0, 255);
-                image_buffer[(j * image_width + i) * 3 + 1] = static_cast<unsigned char>(g);
-                int b = std::clamp(int(pixel_color.b * pixel_samples_scale + 0.5), 0, 255);
-                image_buffer[(j * image_width + i) * 3 + 2] = static_cast<unsigned char>(b);
+                color finalPix = {0, 0, 0};
+                if (allEscaped) {
+                    double scale = 1.0 / samples_per_pixel;
+                    finalPix.r   = std::clamp(int(sumColor.r * scale + 0.5), 0, 255);
+                    finalPix.g   = std::clamp(int(sumColor.g * scale + 0.5), 0, 255);
+                    finalPix.b   = std::clamp(int(sumColor.b * scale + 0.5), 0, 255);
+                }
+
+                image_buffer[(j * image_width + i) * 3 + 0] = static_cast<unsigned char>(finalPix.r);
+                image_buffer[(j * image_width + i) * 3 + 1] = static_cast<unsigned char>(finalPix.g);
+                image_buffer[(j * image_width + i) * 3 + 2] = static_cast<unsigned char>(finalPix.b);
             }
+
+            int done = ++lines_done;
+            if (omp_get_thread_num() == 0)
+                std::cout << "\rScanlines remaining: " << (image_height - done) << ' ' << std::flush;
         }
 
         memcpy(new_img, image_buffer.data(), img_size);
