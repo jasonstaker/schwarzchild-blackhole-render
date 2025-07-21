@@ -29,6 +29,7 @@ class camera {
     unsigned char* background;   // background image location
     int background_width;        // background image width
     int background_height;       // background image height
+    int background_channels;     // background image channels
 
     // MODIFIES: this
     // EFFECTS: initializes all the necessary variables for rendering
@@ -130,12 +131,13 @@ class camera {
     // MODIFIES: this
     // EFFECTS: renders and integrates all the geodesics
     unsigned char* render(int width, int height, int channels, unsigned char* img) {
-        this->background  = img;
-        background_width  = width;
-        background_height = height;
+        this->background    = img;
+        background_width    = width;
+        background_height   = height;
+        background_channels = channels;
         initialize();
 
-        size_t img_size = (image_width * image_height * channels);
+        size_t img_size = (image_width * image_height * background_channels);
         std::vector<unsigned char> image_buffer(img_size);
 
         unsigned char* new_img = static_cast<unsigned char*>(malloc(img_size));
@@ -173,9 +175,9 @@ class camera {
                     finalPix.b   = std::clamp(int(sumColor.b * scale + 0.5), 0, 255);
                 }
 
-                image_buffer[(j * image_width + i) * 3 + 0] = static_cast<unsigned char>(finalPix.r);
-                image_buffer[(j * image_width + i) * 3 + 1] = static_cast<unsigned char>(finalPix.g);
-                image_buffer[(j * image_width + i) * 3 + 2] = static_cast<unsigned char>(finalPix.b);
+                image_buffer[(j * image_width + i) * background_channels + 0] = static_cast<unsigned char>(finalPix.r);
+                image_buffer[(j * image_width + i) * background_channels + 1] = static_cast<unsigned char>(finalPix.g);
+                image_buffer[(j * image_width + i) * background_channels + 2] = static_cast<unsigned char>(finalPix.b);
             }
 
             int done = ++lines_done;

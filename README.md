@@ -6,6 +6,8 @@ A high-performance visual simulation of light trajectories around a Schwarzschil
 
 ![Sample Output](assets/sample_output.jpg)
 
+---
+
 ## Features
 
 * **General relativity simulation** using geodesics in Schwarzschild spacetime
@@ -13,8 +15,6 @@ A high-performance visual simulation of light trajectories around a Schwarzschil
 * **Background image mapping** for realistic starfield visuals
 * **Multithreaded rendering** using OpenMP
 * **Test suite** powered by GoogleTest
-
----
 
 ## File Structure Overview
 
@@ -43,8 +43,6 @@ A high-performance visual simulation of light trajectories around a Schwarzschil
 ├── output.jpg              # Rendered output file
 └── README.md
 ```
-
----
 
 ## Building and Running
 
@@ -75,8 +73,6 @@ cmake --build .
 
 This will render an image to `output.jpg` using the background at `assets/background.jpg`.
 
----
-
 ## Running Tests
 
 GoogleTest is automatically downloaded via `FetchContent` and compiled.
@@ -94,15 +90,14 @@ Or run individual test binaries:
 ./test_vec4
 ```
 
----
-
 ## Dependencies
 
 * [stb\_image](https://github.com/nothings/stb) – Image loading and saving
 * [GoogleTest](https://github.com/google/googletest) – Unit testing
 
----
-
 ## License
 
 This project is licensed under the terms of the MIT License. See `LICENSE` for more information.
+
+## Credits & Acknowledgments
+This project’s mathematical derivations and conceptual architecture for simulating a Schwarzschild black hole in C++ were inspired by James’ tutorial, “Implementing General Relativity: Rendering the Schwarzschild black hole, in C++,” originally published May 31, 2024 on https://20k.github.io/c++/2024/05/31/schwarzschild.html. While the code has been independently developed from the ground up, this post provided the theoretical foundation and overall structure for the geodesic integration and metric setup.
