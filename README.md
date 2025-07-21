@@ -100,4 +100,4 @@ Or run individual test binaries:
 This project is licensed under the terms of the MIT License. See `LICENSE` for more information.
 
 ## Credits & Acknowledgments
-This project’s mathematical derivations and conceptual architecture for simulating a Schwarzschild black hole in C++ were inspired by James’ tutorial, “Implementing General Relativity: Rendering the Schwarzschild black hole, in C++,” originally published May 31, 2024 on https://20k.github.io/c++/2024/05/31/schwarzschild.html. While the code has been independently developed from the ground up, this post provided the theoretical foundation and overall structure for the geodesic integration and metric setup.
+This project’s mathematical derivations and conceptual architecture for simulating a Schwarzschild black hole in C++ were inspired by James’ tutorial, “Implementing General Relativity: Rendering the Schwarzschild black hole, in C++,” originally published May 31, 2024 on https://20k.github.io/c++/2024/05/31/schwarzschild.html. While the code has been independently developed from the ground up, this post provided the mathematical foundation for the geodesic integration and metric setup.
